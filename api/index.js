@@ -1,13 +1,19 @@
+const {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectsCommand,
+} = require("@aws-sdk/client-s3");
+
 const express = require("express");
 const multer = require("multer");
 const { v4: uuidv4 } = require("uuid");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const cors = require("cors");
 const morgan = require("morgan");
 const helmet = require("helmet");
+const dotenv = require("dotenv").config();
+
 const app = express();
 const upload = multer();
-const dotenv = require("dotenv").config();
 
 const port = process.env.PORT || 3001;
 const REGION = process.env.AWS_REGION;
@@ -69,7 +75,42 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
+app.post("/delete", async (req, res) => {
+  const { images } = req.body;
+
+  if (!images || !Array.isArray(images)) {
+    return res.status(400).send("Invalid request format.");
+  }
+
+  const objectsToDelete = images.map((imageUrl) => {
+    const urlParts = imageUrl.split("/");
+    const key = urlParts.slice(3).join("/"); // Extracting the key from the URL
+    return { Key: key };
+  });
+
+  const params = {
+    Bucket: BUCKET_NAME,
+    Delete: {
+      Objects: objectsToDelete,
+      Quiet: false,
+    },
+  };
+
+  try {
+    const command = new DeleteObjectsCommand(params);
+    const data = await s3Client.send(command);
+    if (data.$metadata.httpStatusCode !== 200) {
+      throw new Error("Failed to delete files.");
+    }
+    res.send(`Deleted ${data.Deleted.length} files successfully.`);
+  } catch (error) {
+    console.error("Error deleting files:", error);
+    res.status(500).send(`Failed to delete files: ${error.message}`);
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
+
 module.exports = app;
