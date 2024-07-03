@@ -1,7 +1,7 @@
 const {
   S3Client,
   PutObjectCommand,
-  DeleteObjectsCommand,
+  DeleteObjectCommand,
 } = require("@aws-sdk/client-s3");
 
 const express = require("express");
@@ -76,36 +76,30 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 });
 
 app.post("/delete", async (req, res) => {
-  const { images } = req.body;
+  const { imageUrl } = req.body;
 
-  if (!images || !Array.isArray(images)) {
+  if (!imageUrl || typeof imageUrl !== "string") {
     return res.status(400).send("Invalid request format.");
   }
 
-  const objectsToDelete = images.map((imageUrl) => {
-    const urlParts = imageUrl.split("/");
-    const key = urlParts.slice(3).join("/"); // Extracting the key from the URL
-    return { Key: key };
-  });
+  const urlParts = imageUrl.split("/");
+  const key = urlParts.slice(3).join("/"); // Extracting the key from the URL
 
   const params = {
     Bucket: BUCKET_NAME,
-    Delete: {
-      Objects: objectsToDelete,
-      Quiet: false,
-    },
+    Key: key,
   };
 
   try {
-    const command = new DeleteObjectsCommand(params);
+    const command = new DeleteObjectCommand(params);
     const data = await s3Client.send(command);
     if (data.$metadata.httpStatusCode !== 200) {
-      throw new Error("Failed to delete files.");
+      throw new Error("Failed to delete file.");
     }
-    res.send(`Deleted ${data.Deleted.length} files successfully.`);
+    res.send(`Deleted file successfully.`);
   } catch (error) {
-    console.error("Error deleting files:", error);
-    res.status(500).send(`Failed to delete files: ${error.message}`);
+    console.error("Error deleting file:", error);
+    res.status(500).send(`Failed to delete file: ${error.message}`);
   }
 });
 
